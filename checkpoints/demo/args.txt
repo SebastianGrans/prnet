@@ -4,7 +4,7 @@
   "emb_nn": "dgcnn",
   "attention": "transformer",
   "head": "svd",
-  "svd_on_gpu": true,
+  "svd_on_gpu": false,
   "n_emb_dims": 512,
   "n_blocks": 1,
   "n_heads": 4,
@@ -30,7 +30,7 @@
   "unseen": false,
   "n_points": 1024,
   "n_subsampled_points": 768,
-  "dataset": "bunny",
+  "dataset": "modelnet40",
   "rot_factor": 4,
   "model_path": ""
 }

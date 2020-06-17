@@ -6,7 +6,9 @@
 echo '' > memory.txt
 while true
 do
-    echo "$(date '+TIME:%H:%M:%S') $(nvidia-smi -q -i 0 -d MEMORY | sed '12!d'
+    echo "0: $(date '+TIME:%H:%M:%S') $(nvidia-smi -q -i 0 -d MEMORY | sed '12!d'
+    -)" >> memory.txt
+    echo "1: $(date '+TIME:%H:%M:%S') $(nvidia-smi -q -i 1 -d MEMORY | sed '12!d'
     -)" >> memory.txt
     sleep 1
 done

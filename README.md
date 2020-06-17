@@ -4,14 +4,14 @@ Fork of PRNet
 ## Setup
 
 ```
-> python3 -m venv venv
-> source venv/bin/activate
-> pip install torch numpy scipy h5py tqdm sklearn
+python3 -m venv venv
+source venv/bin/activate
+pip install torch numpy scipy h5py tqdm sklearn
 ```
 
 ## Train
 ```
-> python3 main.py --exp_name "demo" --svd_on_gpu 
+python3 main.py --exp_name "demo" --svd_on_gpu 
 ```
 
 ## Test
@@ -19,12 +19,12 @@ This will load a single sample with the same dataloader as the original author h
 It then applies `PRNet.predict()` which runs the network three times on the source and traget network.
 
 ```
-> python3 main.py --exp_name "demo" --eval 
+python3 main.py --exp_name "demo" --eval 
 ```
 
 The following will also visualize the point clouds before and after transformation with the predicted R and t.
 ```
-> python3 main.py --exp_name "demo" --eval --visualize 
+python3 main.py --exp_name "demo" --eval --visualize 
 ```
 
 
@@ -33,7 +33,7 @@ The following will also visualize the point clouds before and after transformati
 (Seems like I've accidentally installed some other things other than the aforementioned requirements.)
 
 ```
-> pip list --format columns
+pip list --format columns
 Package            Version                
 ------------------ -----------------------
 attrs              19.3.0                 

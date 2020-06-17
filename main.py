@@ -109,7 +109,8 @@ def main():
     parser.add_argument('--emb_nn', type=str, default='dgcnn', metavar='N',
                         choices=['pointnet', 'dgcnn'],
                         help='Embedding to use, [pointnet, dgcnn]')
-    parser.add_argument('--attention', type=str, default='transformer', metavar='N',
+    parser.add_argument('--attention', type=str, default='transformer',
+                        metavar='N',
                         choices=['identity', 'transformer'],
                         help='Head to use, [identity, transformer]')
     parser.add_argument('--head', type=str, default='svd', metavar='N',
@@ -133,14 +134,16 @@ def main():
                         help='Num of keypoints to use')
     parser.add_argument('--temp_factor', type=float, default=100, metavar='N',
                         help='Factor to control the softmax precision')
-    parser.add_argument('--cat_sampler', type=str, default='gumbel_softmax', choices=['softmax', 'gumbel_softmax'],
-                        metavar='N', help='use gumbel_softmax to get the categorical sample')
+    parser.add_argument('--cat_sampler', type=str, default='gumbel_softmax',
+                        choices=['softmax', 'gumbel_softmax'],
+                        metavar='N', 
+                        help='use gumbel_softmax to get the categorical sample')
     parser.add_argument('--dropout', type=float, default=0.0, metavar='N',
                         help='Dropout ratio in transformer')
-    parser.add_argument('--batch_size', type=int, default=6, metavar='batch_size',
-                        help='Size of batch)')
-    parser.add_argument('--test_batch_size', type=int, default=12, metavar='batch_size',
-                        help='Size of batch)')
+    parser.add_argument('--batch_size', type=int, default=6,
+                        metavar='batch_size', help='Size of batch)')
+    parser.add_argument('--test_batch_size', type=int, default=12, 
+                        metavar='batch_size', help='Size of batch)')
     parser.add_argument('--epochs', type=int, default=100, metavar='N',
                         help='number of episode to train ')
     parser.add_argument('--use_sgd', type=bool, default=False,

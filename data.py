@@ -105,7 +105,7 @@ class ModelNet40(Dataset):
                 self.data = self.data[self.label<20]
                 self.label = self.label[self.label<20]
 
-    def __getitem__(self, item, vis=True):
+    def __getitem__(self, item, vis=False):
         # I don't understand how the ModelNet data works. Because somehow the point cloud is uniformly subsampled by simply taking the n last points.
         pointcloud = self.data[item][:self.num_points]
         if self.partition != 'train':
@@ -161,6 +161,9 @@ class ModelNet40(Dataset):
             pcd1 = pcd1.paint_uniform_color([1, 0, 0])
             pcd2 = pcd2.paint_uniform_color([0, 1, 0])
             o3d.visualization.draw_geometries([pcd1, pcd2])
+
+        #nanidcs = np.random.randint(pointcloud1.shape[1], size=70)
+        #pointcloud1.T[nanidcs] = [np.nan, np.nan, np.nan]
 
         return pointcloud1.astype('float32'), pointcloud2.astype('float32'), R_ab.astype('float32'), \
                translation_ab.astype('float32'), R_ba.astype('float32'), translation_ba.astype('float32'), \
@@ -355,27 +358,39 @@ class TLessModel(Dataset):
     def __len__(self):
         return 1
 
-class TLessScan(Dataset):
+
+class TLess(Dataset):
     def __init__(self, num_points=768, 
                 tlesspath='/home/grans/Documents/t-less_v2/', 
                 obj2scene='/home/grans/Documents/prnet2/obj2scenelist.pkl',
                 scene2obj='/home/grans/Documents/prnet2/scene2objlist.pkl',
-                scenes=None,
-                objects=None,
+                mesh_type='models_cad', # models_cad, models_cad_subdivided, models_reconst
+                scenes=list(range(1, 21)),
+                objects=list(range(1, 31)),
                 window_size=None):
-        self.tlesspath = tlesspath
+
+        
         self.num_points = num_points
+        self.tlesspath = tlesspath
+
         self.obj2scene = pickle.load(open(obj2scene, 'rb'))
         self.scene2obj = pickle.load(open(scene2obj, 'rb'))
 
-        self.gt_mask = os.path.join(self.tlesspath, 'test_primesense', '{:02d}', 'gt.yml')
-        self.info_mask = os.path.join(self.tlesspath, 'test_primesense', '{:02d}', 'info.yml')
-        self.depth_image_mask = os.path.join(self.tlesspath, 'test_primesense', '{:02d}', 'depth', '{:04d}.png')
+        self.scenes = scenes
+        self.objects = objects
 
-        if scenes is None:
-            self.scenes = list(range(1, 21))
-        if objects is None:
-            self.objects = list(range(1, 31))
+        self.gt_mask = os.path.join(self.tlesspath, 'test_primesense', 
+                                                    '{:02d}', 'gt.yml')
+        self.mesh_mask = os.path.join(self.tlesspath, mesh_type, 
+                                                    'obj_{:02d}.ply')
+        self.info_mask = os.path.join(self.tlesspath, 'test_primesense', 
+                                                    '{:02d}', 'info.yml')
+
+        self.rgb_image_mask = os.path.join(self.tlesspath, 'test_primesense', 
+                                            '{:02d}', 'rgb', '{:04d}.png')
+        self.depth_image_mask = os.path.join(self.tlesspath, 'test_primesense',
+                                            '{:02d}', 'depth', '{:04d}.png')
+
 
     def random_by_scene_id(self, scene_id):
         return np.random.choice(self.scene2obj[scene_id])
@@ -392,8 +407,10 @@ class TLessScan(Dataset):
                         obj_id=None, 
                         scene_id=None, 
                         instance_idx=None, vis=True):
-        if view_id is None: # This should probably be a specific view of a scene.
-            view_id = np.random.randint(504) # Each scene has 504 images 0000.png to 503.png
+
+        if view_id is None:
+            # Each scene has 504 images 0000.png to 503.png
+            view_id = np.random.randint(504) 
         
         if obj_id is None:
             if scene_id is None:
@@ -430,16 +447,75 @@ class TLessScan(Dataset):
         if instance_idx is not None:
             obj_id_gt = obj_id_gts[instance_idx]
         else:
+            # If there are multiple instances of the obj in the scene, we 
+            # randomly select one of them.
             instance_idx, obj_id_gt = random.choice(list(enumerate(obj_id_gts)))
+
+        Rm2c = np.array(obj_id_gt['cam_R_m2c']).reshape(3,3)
+        tm2c = np.array(obj_id_gt['cam_t_m2c'])[np.newaxis].T
+
+        Rab = Rm2c
+        tab = tm2c
+        euler_ab = Rotation.from_matrix(Rm2c).as_euler('zyx')
+
+        Rba = Rab.T
+        tba = -Rba.dot(tab)
+        euler_ba = -euler_ab[::-1]
+        
+        mesh = o3d.io.read_triangle_mesh(self.mesh_mask.format(obj_id))
+        obj_pcd = mesh.sample_points_poisson_disk(self.num_points)
 
 
         if vis:
-            pcd = o3d.geometry.PointCloud().create_from_depth_image(depth_raw, 
-                        cameraIntrinsics, 
-                        depth_scale=1/scale)
-            o3d.visualization.draw_geometries([pcd])
+            # During visualization it can be nice to have the point cloud 
+            # colored so that it's easier to see what it represents.
+            color_raw = o3d.io.read_image(self.rgb_image_mask.format(scene_id, view_id))
+            rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(
+                color_raw, 
+                depth_raw, 
+                depth_scale=(1/scale), 
+                depth_trunc=np.inf, 
+                convert_rgb_to_intensity=False
+            )
+            scan_pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
+                rgbd_image, 
+                o3d.camera.PinholeCameraIntrinsic(cameraIntrinsics)
+            )
+        else:
+            scan_pcd = o3d.geometry.PointCloud().create_from_depth_image(depth_raw, 
+                        o3d.camera.PinholeCameraIntrinsic(cameraIntrinsics), depth_scale=(1/scale))
 
+        if vis:
+            Tm2c = np.hstack((Rm2c, tm2c))
+            Tm2c = np.vstack((Tm2c, [0, 0, 0, 1])) 
+            
+            mesh.compute_vertex_normals() # Just to make it look good. 
+            mesh.paint_uniform_color([1, 0.706, 0])
+            mesh.transform(Tm2c)
+            #mesh.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+            #pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+            # o3d.visualization.draw_geometries([mesh])
+
+            o3d.visualization.draw_geometries([mesh, scan_pcd])
+
+        pointcloud1 = np.asarray(obj_pcd.points)
+        pointcloud2 = np.asarray(scan_pcd.points)
+
+        info = (scene_id, obj_id, view_id, instance_idx)
+
+        # pcds: (3, n) float32
+        # R_ab: (3, 3) float32
+        # t_ab: (3,) float32
+        # euler_ab: (3,) float32
+        # info: tuple (scene_id, obj_id, view_id, instance_idx)
         
+        return pointcloud1.astype('float32'), pointcloud2.astype('float32'), \
+            Rab.astype('float32'), tab.astype('float32'), \
+            Rba.astype('float32'), tba.astype('float32'), \
+            euler_ab.astype('float32'), euler_ba.astype('float32'), \
+            info
+            
+
 
     def __len__(self):
             return 1
@@ -447,13 +523,26 @@ class TLessScan(Dataset):
 if __name__ == '__main__':
     # tlessmodel = TLessModel()
     # t = tlessmodel.__getitem__()
-    tlscan = TLessScan()
-    tlscan.__getitem__()
+    tlscan = TLess()
+    p1, p2, rab, tab, rba, tba, eulab, eulba, info = tlscan.__getitem__(vis=False)
+    print("Scene: %d Obj: %d View: %d, Instance: %d" % info)
+    pcd1 = o3d.geometry.PointCloud(
+        o3d.utility.Vector3dVector(p1)
+    )
+    pcd2 = o3d.geometry.PointCloud(
+        o3d.utility.Vector3dVector(p2)
+    )
+    pcd1.paint_uniform_color([1, 0.706, 0])
+    o3d.visualization.draw_geometries([pcd1, pcd2])
+    tab = np.vstack((np.hstack((rab, tab)), [0, 0, 0, 1]))
+    pcd1.transform(tab)
+    o3d.visualization.draw_geometries([pcd1, pcd2])
 
-    #pts = 128
+
+    # pts = 128
     # d = ModelNet40(num_points=pts,
     #                 num_subsampled_points=pts,
     #                 partition='test',
     #                 rot_factor=4)
-    #d.__getitem__(0)
+    # d.__getitem__(0)
     print('hello world')

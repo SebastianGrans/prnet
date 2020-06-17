@@ -55,9 +55,12 @@ def get_graph_feature(x, k=20):
     x = x.view(*x.size()[:3])
     idx = knn(x, k=k)  # (batch_size, num_points, k)
     batch_size, num_points, _ = idx.size()
-    device = torch.device('cuda')
+    # device = idx.device
+    # torch.cuda.set_device(0)
+    torch.cuda.set_device(idx.device)
 
-    idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1) * num_points
+    idx_base = torch.arange(0, batch_size, device=idx.device).view(-1, 1, 1) * num_points
+    # idx_base = torch.arange(0, batch_size).view(-1, 1, 1) * num_points
 
     idx = idx + idx_base
 
@@ -742,11 +745,9 @@ class PRNet(nn.Module):
         total_cycle_consistency_loss = 0.0
         total_scale_consensus_loss = 0.0
         for data in tqdm(train_loader):
-            src, tgt, rotation_ab, translation_ab, rotation_ba, translation_ba, euler_ab, euler_ba = [d.cuda()
-                                                                                                      for d in data]
+            src, tgt, rotation_ab, translation_ab, rotation_ba, translation_ba, euler_ab, euler_ba = [d.cuda() for d in data]
             loss, feature_alignment_loss, cycle_consistency_loss, scale_consensus_loss,\
-            rotation_ab_pred, translation_ab_pred = self._train_one_batch(src, tgt, rotation_ab, translation_ab,
-                                                                                opt)
+            rotation_ab_pred, translation_ab_pred = self._train_one_batch(src, tgt, rotation_ab, translation_ab, opt)
             batch_size = src.size(0)
             num_examples += batch_size
             total_loss = total_loss + loss * batch_size
