@@ -1,6 +1,8 @@
 # Partial Registration Network
 Fork of PRNet 
 
+*Note:* This repo is actively being worked on and might be broken at any point.
+
 ## Setup
 
 ```
